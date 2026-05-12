@@ -1,0 +1,61 @@
+name: Universal File Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Download URL'
+        required: true
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create downloads directory
+        run: |
+          mkdir -p downloads
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y ffmpeg wget curl python3-pip
+          pip3 install yt-dlp
+
+      - name: Download file
+        run: |
+          URL="${{ github.event.inputs.url }}"
+          
+          if [[ "$URL" == *"youtube.com"* ]] || [[ "$URL" == *"youtu.be"* ]] || \
+             [[ "$URL" == *"instagram.com"* ]] || [[ "$URL" == *"twitter.com"* ]] || \
+             [[ "$URL" == *"tiktok.com"* ]] || [[ "$URL" == *"facebook.com"* ]]; then
+            yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
+                   --merge-output-format mp4 \
+                   -o "downloads/%(title)s.%(ext)s" \
+                   "$URL"
+          else
+            cd downloads
+            wget --no-check-certificate \
+                 --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                 --header="Accept: video/webm,video/mp4,application/octet-stream,*/*" \
+                 --header="Referer: https://www.youtube.com/" \
+                 --content-disposition \
+                 --trust-server-names \
+                 "$URL"
+            cd ..
+          fi
+
+      - name: List downloaded files
+        run: |
+          echo "Files in downloads folder:"
+          ls -la downloads/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: downloaded-files
+          path: downloads/
